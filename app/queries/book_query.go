@@ -71,7 +71,7 @@ func (q *BookQueries) UpdateBook(id uuid.UUID, b *models.Book) error {
 }
 
 // DeleteBook method for delete book by given ID.
-func (b *BookQueries) DeleteBook(id uuid.UUID) error { 
+func (q *BookQueries) DeleteBook(id uuid.UUID) error { 
 	query := `DELETE FROM books WHERE id = $1`
 
 	_, err := q.Exec(query, id)
