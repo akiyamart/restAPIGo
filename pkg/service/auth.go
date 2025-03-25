@@ -2,6 +2,7 @@ package service
 
 import (
 	"crypto/sha1"
+	"errors"
 	"fmt"
 	"time"
 
@@ -15,13 +16,21 @@ const (
 	signingKey = "zxcvbnmasdfghjklqwewqfdsacxzf"
 	tokenTTL   = 12 * time.Hour
 )
+
+type AuthService struct {
+	repo repository.Authorization
+}
+
 type TokenClaims struct {
 	jwt.StandardClaims
 	UserId int `json:"user_id"`
 }
 
-type AuthService struct {
-	repo repository.Authorization
+func generatePasswordHash(password string) string { 
+	hash := sha1.New()
+	hash.Write([]byte(password))
+
+	return fmt.Sprintf("%x", hash.Sum([]byte(salt)))
 }
 
 func NewAuthService(repo repository.Authorization) *AuthService { 
@@ -50,9 +59,22 @@ func(s *AuthService) GenerateToken(username, password string) (string, error) {
 	return token.SignedString([]byte(signingKey))
 }
 
-func generatePasswordHash(password string) string { 
-	hash := sha1.New()
-	hash.Write([]byte(password))
+func (s *AuthService) ParseToken(accessToken string) (int, error) { 
+	token, err := jwt.ParseWithClaims(accessToken, &TokenClaims{}, func(token *jwt.Token) (interface{}, error) {
+		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok { 
+			return nil, errors.New(("invalid signature method"))
+		}
+		
+		return []byte(signingKey), nil
+	})
+	if err != nil {
+		return 0, err
+	}
 
-	return fmt.Sprintf("%x", hash.Sum([]byte(salt)))
+	claims, ok := token.Claims.(*TokenClaims)
+	if !ok { 
+		return 0, errors.New("token claims are not valid")
+	}
+
+	return claims.UserId, nil
 }
